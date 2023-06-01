@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Modbus TCP Data Reader</title>
+    <!-- Bootstrap 4 CSS -->
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+    />
+
+    <style>
+      .sticky-header {
+        position: sticky;
+        top: 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ส่วนของเนื้อหาเว็บไซต์ -->
+
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-sm-3 t pt-4">
+          <div class="alert alert-success">
+            <h2 class="text-center">กรอกข้อมูล</h2>
+          </div>
+          <form method="POST">
+            <div class="form-group">
+              <label for="slave_id">Slave ID</label>
+              <input
+                type="number"
+                class="form-control"
+                id="slave_id"
+                name="slave_id"
+                value="{{slave_id}}"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="function_code">Function Code</label>
+              <select
+                class="form-control"
+                id="function_code"
+                name="function_code"
+                required
+              >
+                <option value="">เลือก Function Code</option>
+                <option value="1">Read Coil Status (FC 1)</option>
+                <option value="2">Read Input Status (FC 2)</option>
+                <option value="3">Read Holding Registers (FC 3)</option>
+                <option value="4">Read Input Registers (FC 4)</option>
+                <option value="5">Write Single Coil (FC 5)</option>
+                <option value="6">Write Single Register (FC 6)</option>
+                <!-- เพิ่มตัวเลือกอื่น ๆ ตามต้องการ -->
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="starting_address">Starting Address</label>
+              <input
+                type="number"
+                class="form-control"
+                id="starting_address"
+                name="starting_address"
+                value="{{starting_address}}"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="quantity">Quantity</label>
+              <input
+                type="number"
+                class="form-control"
+                id="quantity"
+                name="quantity"
+                value="{{quantity}}"
+                required
+              />
+            </div>
+            <div class="text-center">
+              <button type="submit" class="btn btn-success">Read Data</button>
+              <button
+                type="button"
+                class="btn btn-warning"
+                onclick="clearForm()"
+              >
+                Clear
+              </button>
+            </div>
+            <div class="text-center mt-5">
+              <div class="spinner-grow text-primary" role="status">
+                <span class="visually-hidden"></span>
+              </div>
+              <div class="spinner-grow text-secondary" role="status">
+                <span class="visually-hidden"></span>
+              </div>
+              <div class="spinner-grow text-success" role="status">
+                <span class="visually-hidden"></span>
+              </div>
+              <div class="spinner-grow text-danger" role="status">
+                <span class="visually-hidden"></span>
+              </div>
+              <div class="spinner-grow text-warning" role="status">
+                <span class="visually-hidden"></span>
+              </div>
+              <div class="spinner-grow text-info" role="status">
+                <span class="visually-hidden"></span>
+              </div>
+              <div class="spinner-grow text-dark" role="status">
+                <span class="visually-hidden"></span>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="col-sm-9">
+          <!-- ส่วนของเนื้อหาเว็บไซต์ -->
+
+          <div class="table-responsive" style="max-height: 900px">
+            <div class="alert alert-primary mt-4">
+              <h2 class="text-center">แสดงข้อมูล</h2>
+            </div>
+            {% if data_list %}
+            <table id="data-table" class="table table-hover">
+              <thead class="table-dark sticky-header">
+                <tr class="">
+                  <th>Address</th>
+                  <th>Value 1</th>
+                  <th>Value 2</th>
+                  <th>Hexadecimal Representation</th>
+                  <th>Decimal representation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for data in data_list %}
+                <tr>
+                  <td>{{ data['address'] }}</td>
+                  <td>{{ data['value1'] }}</td>
+                  <td>{{ data['value2'] }}</td>
+                  <td>{{ data['combined_value'] }}</td>
+                  <td>{{ data['ieee754_value'] }}</td>
+                  <!-- <td>{{ '{:.4f}'.format(data['ieee754_value']) }}</td> -->
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <script
+      src="https://code.jquery.com/jquery-3.6.0.min.js"
+      integrity="sha384-WJjTgc1Oy3M+wVvqtdi6j2ih2BVm4oH4w5OBAmGFDh6vUh4vKA9SMKq+tgXHkXAL"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap4.min.js"></script>
+    <script>
+      // เมื่อโหลดหน้าเว็บ
+      window.addEventListener("load", function () {
+        // ดึงค่าที่เก็บใน Local Storage
+        var storedSlaveId = localStorage.getItem("slave_id");
+        var storedFunctionCode = localStorage.getItem("function_code");
+        var storedStartingAddress = localStorage.getItem("starting_address");
+        var storedQuantity = localStorage.getItem("quantity");
+
+        // กำหนดค่าให้กับฟอร์ม
+        document.getElementById("slave_id").value = storedSlaveId;
+        document.getElementById("function_code").value = storedFunctionCode;
+        document.getElementById("starting_address").value =
+          storedStartingAddress;
+        document.getElementById("quantity").value = storedQuantity;
+      });
+
+      // เมื่อกดปุ่ม "Read Data"
+      document
+        .querySelector("form")
+        .addEventListener("submit", function (event) {
+          // บันทึกค่าที่กรอกลงใน Local Storage
+          localStorage.setItem(
+            "slave_id",
+            document.getElementById("slave_id").value
+          );
+          localStorage.setItem(
+            "function_code",
+            document.getElementById("function_code").value
+          );
+          localStorage.setItem(
+            "starting_address",
+            document.getElementById("starting_address").value
+          );
+          localStorage.setItem(
+            "quantity",
+            document.getElementById("quantity").value
+          );
+        });
+
+      // เมื่อกดปุ่ม "Clear"
+      function clearForm() {
+        // ล้างค่าใน Local Storage
+        localStorage.removeItem("slave_id");
+        localStorage.removeItem("function_code");
+        localStorage.removeItem("starting_address");
+        localStorage.removeItem("quantity");
+
+        // ล้างค่าในฟอร์ม
+        document.getElementById("slave_id").value = "";
+        document.getElementById("function_code").value = "";
+        document.getElementById("starting_address").value = "";
+        document.getElementById("quantity").value = "";
+      }
+      // เรียกใช้งาน DataTables
+      $(document).ready(function () {
+        $("#data-table").DataTable();
+      });
+    </script>
+    <!-- ส่วนของการเรียกใช้ Bootstrap 4 JavaScript -->
+    <script
+      src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+      integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+      integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
+      integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+  </body>
+</html>
